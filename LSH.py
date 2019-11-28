@@ -115,16 +115,14 @@ f.seek(0)
 dirtyFeatureMatrix = generateFeatureMatrix(dirtyDict, n,f)
 print("Training data is ready.")
 
-sim=pairwise_distances(dirtyFeatureMatrix,metric='jaccard')
+dist=pairwise_distances(dirtyFeatureMatrix,metric='jaccard')
 
-dist = np.zeros([m,m], dtype = float)
+print("Jaccard sim:")
+sim = np.zeros([m,m], dtype = float)
 for i in range(sim.shape[0]):
 	for j in range(sim.shape[1]):
-		dist[i,j] = 1 - sim[i,j]
-
-print("Jaccard distance:")
-print(dist)
-print(dist.shape)
+		sim[i,j] = 1 - dist[i,j]
+print(sim)
 
 
 
