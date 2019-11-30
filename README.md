@@ -10,3 +10,5 @@ Sorry for this inconvinence, this is due to the parallel implementation.
 During running, you will be asked to input number of concurrent processes. The recommended value
 is two times of CPU cores, but if you are not sure please type in:
     4
+The output will include the ground truth similarity, time consumption,
+esitimated similarity, time consumption, and MSE.
