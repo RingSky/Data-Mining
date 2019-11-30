@@ -11,16 +11,26 @@ import numpy as np
 import sys
 from sklearn.metrics import pairwise_distances
 import multiprocessing
-
-import pickle
+import timeit
 from heapq import heapify,heappop,heappush
 import random
 
-m = 3000 #data size
-n = 5100 #total words
-p = 460 #clean words
-k = 5 #preserve word with frequency >=k, this is cleaning
 
+def getDocLowestShingleID(featureVector):
+	global randomNoA
+	global randomNoB
+	docLowestShingleID = {}
+	lowestShingleID = []
+	#print(docIndex)
+	for x in range(0,16):
+		listFx = []
+		for i in range(len(featureVector)):
+			if (featureVector[i] != 0):
+				temp = (randomNoA[x] * i + randomNoB[x]) % 5101 # temp is a hashed value of a word of a doc.
+				listFx.append(temp)
+		heapify(listFx)
+		lowestShingleID.append(heappop(listFx)) #lowestShingleID stores k lowest word's hashed index in the feature.
+	return lowestShingleID
 
 def generatesLabelVector(f):
 	contents = f.readline()
@@ -107,36 +117,6 @@ def printPredictedExamples(f,predictedLabel):
 		lineNumber +=1
 		contents = f.readline()
 
-"""-----------------------------Main Program-----------------------------------"""
-
-#Data preprocess
-print("Loading and processing training data.")
-f = open(r'./data.txt', 'r',encoding = 'utf -8')
-labelVector = generatesLabelVector(f)
-f.seek(0)
-dirtyDict = GenerateDirtyDict(f, labelVector)
-print("The uncleaned dictionary contains " + str(len(dirtyDict)+1)+" words.")
-f.seek(0)
-featureMatrix = generateFeatureMatrix(dirtyDict, n,f)
-print("Training data is ready.")
-
-"""
-dist=pairwise_distances(featureMatrix,metric='jaccard')
-
-sim = np.zeros([m,m], dtype = float)
-for i in range(sim.shape[0]):
-	for j in range(sim.shape[1]):
-		sim[i,j] = 1 - dist[i,j]
-
-print("Jaccard sim:")
-print(sim)
-"""
-#Reference:https://github.com/rahularora/MinHash/blob/master/minhash.py
-
-
-k = 25 #Number of hash functions.
-prime = 5101
-
 def findRandomNos(k,prime):
 	randList = []
 	randIndex = random.randint(0, prime -1) 
@@ -150,58 +130,72 @@ def findRandomNos(k,prime):
 	
 	return randList
 
-  
-randomNoA = findRandomNos(k,prime)
-randomNoB = findRandomNos(k,prime)
 
-def getDocLowestShingleID(docIndex):
-	global featureMatrix
-	docLowestShingleID = {}
-	lowestShingleID = []
-	print(docIndex)
-	for x in range(0,k):
-		listFx = []
-		for i in range(len(featureMatrix[docIndex])):
-			if (featureMatrix[docIndex][i] != 0):
-				temp = (randomNoA[x] * i + randomNoB[x]) % prime # temp is a hashed value of a word of a doc.
-				listFx.append(temp)
-		heapify(listFx)
-		lowestShingleID.append(heappop(listFx)) #lowestShingleID stores k lowest word's hashed index in the feature.
-	return lowestShingleID
+randomNoA = findRandomNos(16,5101)
+randomNoB = findRandomNos(16,5101)
+
+"""-----------------------------Main Program-----------------------------------"""
+if __name__ == '__main__':
+	m = 3000 #data size
+	n = 5100 #total words
+	p = 460 #clean words
+	k = 5 #preserve word with frequency >=k, this is cleaning
 
 
-p = multiprocessing.Pool(4)
-docIndecs = [x for x in range(1, 10)]
-
-docLowestShingleID = p.map(getDocLowestShingleID, docIndecs)
-p.close()
-p.join()
-
-
-#for doc in docLowestShingleID:
-#  print doc, docLowestShingleID[doc]
-
-def getFileNo(x):
-	if x<10:
-		x = "0" + str(x)
-	else:
-		x = str(x)
+	#Data preprocess
+	print("Loading and processing training data.")
+	f = open(r'./data.txt', 'r',encoding = 'utf -8')
+	labelVector = generatesLabelVector(f)
+	f.seek(0)
+	dirtyDict = GenerateDirtyDict(f, labelVector)
+	print("The uncleaned dictionary contains " + str(len(dirtyDict)+1)+" words.")
+	f.seek(0)
+	featureMatrix = generateFeatureMatrix(dirtyDict, n,f)
+	print("Training data is ready.")
 	
-	return x
+	"""
+	dist=pairwise_distances(featureMatrix,metric='jaccard')
 
-estimateMatrix = []
-for x in range(0,10):
-	doc1LowestShingles = docLowestShingleID[x]
-	col = []
-	for y in range(0,10):
-		doc2LowestShingles = docLowestShingleID[y]
-		count = 0
-		for i in range(0,k):
-			if doc1LowestShingles[i] == doc2LowestShingles[i]:
-				count = count + 1
+	sim = np.zeros([m,m], dtype = float)
+	for i in range(sim.shape[0]):
+		for j in range(sim.shape[1]):
+			sim[i,j] = 1 - dist[i,j]
+
+	print("Jaccard sim:")
+	print(sim)
+	"""
+	#Reference:https://github.com/rahularora/MinHash/blob/master/minhash.py
+
+
+	k = 16 #Number of hash functions.
+	prime = 5101
+
+	start = timeit.default_timer()
+
+	p = multiprocessing.Pool(4)
+	docIndecs = [x for x in range(1, 10)]
+
+	docLowestShingleID = p.map(getDocLowestShingleID, featureMatrix)
+	p.close()
+	p.join()
+	end = timeit.default_timer()
+	print('multi processing time:', str(end-start),'s')
 	
-		col.append(count/k)
-	estimateMatrix.append(col)
-npEstimateMatrix = np.asarray(estimateMatrix, dtype=np.float32)
-print("Estimated sim:")
-print(npEstimateMatrix)
+	estimateMatrix = []
+	for x in range(0,3000):
+		doc1LowestShingles = docLowestShingleID[x]
+		col = []
+		for y in range(0,3000):
+			doc2LowestShingles = docLowestShingleID[y]
+			count = 0
+			for i in range(0,k):
+				if doc1LowestShingles[i] == doc2LowestShingles[i]:
+					count = count + 1
+	
+			col.append(count/k)
+		estimateMatrix.append(col)
+	npEstimateMatrix = np.asarray(estimateMatrix, dtype=np.float32)
+	print("Estimated sim:")
+	print(npEstimateMatrix)
+	print(npEstimateMatrix.shape)
+
